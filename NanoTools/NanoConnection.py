@@ -54,7 +54,7 @@ class NanoConnection:
     dbName = None  # Name of the currently selected database, if one is selected. Else None
 
     # Private Attributes
-    _schemas = None # Dictionary mapping database names to dictionaries, mapping table names to table configurations
+    _schemas = None # Dictionary mapping database names to dictionaries, mapping table names to TableIOs
 
     # Data Model methods
     def __init__(self, dbName=None):
@@ -80,10 +80,10 @@ class NanoConnection:
     # Private methods
     def _getTable(self, name):
         dbName, tableName = self._parseName(name)
-        if tableName in self._schemas[dbName]:
-            return self._schemas[dbName][tableName]
+        if tableName not in self._schemas[dbName]:
+            self._schemas[dbName][tableName] = NanoIO.Table.TableIO(dbName, tableName)
 
-        return NanoIO.Table.TableIO(dbname, tableName)
+        return self._schemas[dbName][tableName]
         
 
     def _parseName(self, name):
@@ -100,10 +100,13 @@ class NanoConnection:
         return queryObj.executeQuery(self) # TODO handle wrapping in Result instance
         
 
-    def close(self):
-        for dbDict in self._schemas.values():
-            for tableIO in dbDict.values():
-                tableIO.close()
+    def close(self, dbNames=None):
+        for dbName, dbDict in self._schemas.items():
+            if dbNames is None or dbName in dbNames:
+                for tableName, tableIO in dbDict.items():
+                    tableIO.close()
+                    self._schemas[dbName].pop(tableName)
+                self._schemas.pop(dbName)
 
     def begin(self):
         pass # TODO transaction support
@@ -123,7 +126,9 @@ class NanoConnection:
         # original db is restored
         """
         
-        NanoFileIO.assertDatabaseExists(dbName)
+        if dbName is not None:
+            NanoIO.File.assertDatabaseExists(dbName)
+
         record = SelectDBExitRecord(self, self.dbName)
         self.dbName = dbName
         return record

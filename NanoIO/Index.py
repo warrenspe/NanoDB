@@ -26,7 +26,7 @@ class IndexIO:
 
         self.cacheMgr = NanoTools.BlockCacheManager.BlockCacheManager(self.indexFD)
         self.delMgr = NanoTools.DeletedBlockManager.DeletedBlockManager(
-            self.dbName, "_idx_%s_%s" % (self.tableName, self.indexConfig.column.name)
+            self.dbName, NanoIO.File.indexFileName(self.tableName, self.indexConfig.column.name)
         )
         self.colType = NanoTypes.getType(self.indexConfig.column.typeString)
 
@@ -267,7 +267,7 @@ class IndexIO:
 
 
     # Public methods
-    def lookup(self, key): # TODO modify indexblock to lookup -> keynotfounderror
+    def lookup(self, key):
         """
         Looks up the position of a single value in the database table file
 

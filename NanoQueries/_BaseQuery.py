@@ -22,4 +22,18 @@ class BaseQuery:
         self.queryParser.populate(self, queryTokens[1:])
 
     def executeQuery(self, conn):
+        """
+        Function which executes this instance of the query.
+
+        Inputs: conn - The NanoConnection calling us.
+
+        Outputs: A dictionary to be wrapped as a NanoResult.
+        """
+
         raise NotImplementedError
+
+    # TODO transaction support
+    def begin(self):
+        pass
+    def rollback(self):
+        pass

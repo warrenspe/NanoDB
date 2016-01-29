@@ -31,7 +31,7 @@ class TableIO:
         self.tableName = tableName
         self.tableFD = NanoIO.File.getTable(dbName, tableName)
         self.configFD = NanoIO.File.getConfig(dbName, tableName)
-        self.delMgr = NanoTools.DeletedBlockManager(dbName, tableName)
+        self.delMgr = NanoTools.DeletedBlockManager.DeletedBlockManager(dbName, tableName)
         self._getTableConfig()
         self._initializeIndices()
         self.constructMemoryMappedRow()

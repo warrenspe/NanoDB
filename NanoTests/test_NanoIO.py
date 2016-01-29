@@ -162,6 +162,21 @@ class TestFile(NanoTests.NanoTestCase):
     tableName = "IOTestFile"
     indexColName = "IOTestIndexedColumn"
 
+    def testRenaming(self): # TODO finish
+        col = NanoConfig.Column.Config()
+        col.name = self.indexColName
+        col.typeString = "int4"
+        self.indexConfig = NanoConfig.Index.Config()
+        self.indexConfig.column = col
+        self.indexConfig.unique = False
+
+        NanoIO.File.deleteIndex(self.dbName, self.tableName, self.indexColName)
+        NanoIO.File.createIndex(self.dbName, self.tableName, self.indexColName)
+
+        NanoIO.createTable(self.dbName, self.tableName).close()
+        tableIO = NanoIO.Table.TableIO(self.dbName, self.tableName)
+        indexIO = NanoIO.Index.IndexIO(self.dbName, self.tableName, self.indexConfig)
+
     def testDatabaseUtils(self): # TODO figure out why this hangs - shutil?
         NanoIO.File.createDatabase(self.dbName2)
 
