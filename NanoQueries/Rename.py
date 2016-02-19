@@ -20,18 +20,30 @@ class Rename(BaseQuery):
 
     def executeQuery(self, conn):
         if self.target == "database":
+            # Ensure that the database we're renaming exists, and that its new name doesn't
             NanoFileIO.assertDatabaseExists(self.oldName)
             if NanoFileIO.checkDatabaseExists(self.newName):
                 raise Exception("Database %s already exists" % self.newName)
-            os.rename(os.path.join(NanoConfig.root_dir, self.oldName),
-                      os.path.join(NanoConfig.root_dir, self.newName))
+
+            # Rename the database
+            os.rename(NanoIO.File.dbPath(self.oldName), NanoIO.File.dbPath(self.newName))
+
+            # If we had currently selected the old database, unselect it
             if conn.currentDatabase() == self.oldName:
-                conn.selectDB(self.newName)
+                conn.selectDB(None)
+
+            # Close any old tableIO connections we had open
+            conn.close(dbNames=[self.oldName])
+
         elif self.target == "table":
-            conn.getCursor(conn.dbName, self.oldName).close()
-            del conn.cursors[conn.dbName][self.oldName]
+            # Parse a dbName and tableName out of the new schema
+            dbName, tableName = conn._parseName(newName)
 
-            os.rename(os.path.join(NanoConfig.root_dir, self.oldName),
-                      os.path.join(NanoConfig.root_dir, self.newName))
+            # Get the table
+            table = conn._getTable(oldName)
 
-            # TODO rename indices
+            # Rename the table
+            NanoIO.File._renameTable(table, dbName, tableName)
+
+            # Close the old TableIO object in the connection
+            conn.close([dbName], [oldTableNam])

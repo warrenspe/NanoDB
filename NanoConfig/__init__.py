@@ -94,3 +94,6 @@ def loadConfiguration(parseCmdLine=True):
     # Set the configuration on our global namespace
     for confName in __CONFIG:
         globals()[confName] = config[confName]
+
+# By default, load configuration on import
+loadConfiguration()

@@ -15,22 +15,26 @@ class Drop(BaseQuery):
 
     def executeQuery(self, conn):
         if self.target == "database":
-            if self.ifExists and not NanoFileIO.checkDatabaseExists(self.name):
+            if self.ifExists and not NanoIO.File.checkDatabaseExists(self.name):
                 return
-            NanoFileIO.deleteDatabase(self.name)
-            if self.name in conn.cursors:
-                for cursor in conn.cursors[self.name].values():
-                    cursor.close()
-                conn.cursors.pop(self.name)
+            NanoIO.File.deleteDatabase(self.name)
+            conn.close([self.target])
 
 
         elif self.target == "table":
-            if self.ifExists and not NanoFileIO.checkTableExists(self.name):
-                return
             dbName, tableName = conn._parseName(self.name)
-            NanoFileIO.deleteTable(dbName, tableName)
-            if conn._hasCursor(dbName, tableName):
-                cursor = conn.getCursor(dbname, tableName)
-                cursor.close()
-                conn.cursors[dbName].pop(tableName)
-                conn.cursorList.pop(cursor)
+
+            if self.ifExists and not NanoIO.File.checkTableExists(tableName):
+                return
+
+            tableIO = conn._getTable(self.name)
+
+            # Delete all associated indices for this table
+            for colName, index in tableIO.indices.items():
+                index.close()
+                NanoIO.File.deleteIndex(dbName, tableName, colName)
+
+            # Delete the table itself
+            tableIO.close()
+            NanoIO.File.deleteTable(dbName, tableName)
+            conn._schemas[dbName].pop(tableName)

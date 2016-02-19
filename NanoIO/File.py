@@ -3,7 +3,7 @@ Contains miscellaneous functions for creating / getting / removing database, tab
 """
 
 # Standard imports
-import os, shutil # TODO reimplement w/o shutils - random hanging
+import os, glob, shutil
 
 # Project imports
 import NanoConfig
@@ -11,7 +11,7 @@ import NanoConfig
 # Static globals
 __TABLE_EXT = "tbl"    # Table Extension
 __CONFIG_EXT = "tcf"   # Table Config Extension
-__INDEX_EXT = "tdx"    # Index Extension
+__INDEX_EXT = "idx"    # Index Extension
 __DELMGR_EXT = "del"   # Deleted Block Manager Extension
 __PTR_FSTR_EXT = "pfs" # Pointer Type Filestore Extension
 
@@ -21,36 +21,31 @@ __PTR_FSTR_EXT = "pfs" # Pointer Type Filestore Extension
 ###
 dbPath = lambda dbName: os.path.join(NanoConfig.root_dir, dbName)
 _path = lambda dbName, fileName, ext: os.path.join(dbPath(dbName), "%s.%s" % (fileName, ext))
-indexPath = lambda dbName, tableName, colName: _path(dbName, "%s_%s" % (tableName, colName), __INDEX_EXT)
+indexFileName = lambda tableName, colName: "_idx_%s_%s" % (tableName, colName)
+indexPath = lambda dbName, tableName, colName: _path(dbName, indexFileName(tableName, colName), __INDEX_EXT)
 tablePath = lambda dbName, tableName: _path(dbName, tableName, __TABLE_EXT)
 configPath = lambda dbName, tableName: _path(dbName, tableName, __CONFIG_EXT)
 delMgrPath = lambda dbName, tableName: _path(dbName, tableName, __DELMGR_EXT)
-ptrFstrPath = lambda dbName, tableName, colName: _path(dbName, "%s_%s" % (tableName, colName), __PTR_FSTR_EXT)
+ptrFstrName = lambda tableName, colName: "%s_%s" % (tableName, colName)
+ptrFstrPath = lambda dbName, tableName, colName: _path(dbName, ptrFstrName(tableName, colName), __PTR_FSTR_EXT)
 
 def checkDatabaseExists(dbName):
-    if dbName is None or not os.path.isdir(dbPath(dbName)):
-        return False
-    return True
+    return dbName is not None and os.path.isdir(dbPath(dbName))
 
 def checkTableExists(dbName, name):
-    if os.path.isfile(tablePath(dbName, name)):
-        return True
-    return False
+    return os.path.isfile(tablePath(dbName, name))
 
 def checkIndexExists(dbName, tableName, colName):
-    if os.path.isfile(indexPath(dbName, tableName, colName)):
-        return True
-    return False
+    return os.path.isfile(indexPath(dbName, tableName, colName))
 
 def checkConfigExists(dbName, name):
-    if os.path.isfile(configPath(dbName, name)):
-        return True
-    return False
+    return os.path.isfile(configPath(dbName, name))
 
 def checkPtrFstrExists(dbName, tableName, colName):
-    if os.path.isfile(ptrFstrPath(dbName, tableName, colName)):
-        return True
-    return False
+    return os.path.isfile(ptrFstrPath(dbName, tableName, colName))
+
+def checkDelMgrExists(dbName, name):
+    return os.path.isfile(delMgrPath(dbName, name))
 
 def assertDatabaseExists(dbName):
     if not checkDatabaseExists(dbName):
@@ -67,6 +62,42 @@ def openReadWriteFile(path):
 ###
 # API Functions
 ###
+
+# Renames
+def _renameIndex(index, dbName, tableName): #TODO test
+    """ Renames an index to a new database / table name. """
+
+    # Flush & close the index
+    index.close()
+
+    # Rename the index data file
+    os.rename(indexPath(dbName, index.tableName, index.indexConfig.column.name),
+              indexPath(dbName, tableName, index.indexConfig.column.name))
+
+    # Rename the deleted manager file for our data file
+    os.rename(delMgrPath(dbName, indexFileName(index.tableName, index.indexConfig.column.name)),
+              delMgrPath(dbName, indexFileName(tableName, index.indexConfig.column.name)))
+    
+
+def _renameTable(table, dbName, tableName): # TODO test
+    """ Renames a table to a new database / table name. """
+
+    # Flush and close the table
+    table.close()
+
+    # Rename the table data file
+    os.rename(tablePath(dbName, table.tableName), tablePath(dbName, tableName))
+
+    # Rename the table config file
+    os.rename(configPath(dbName, table.tableName), configPath(dbName, tableName))
+
+    # Rename the table's deleted manager file
+    os.rename(delMgrPath(dbName, table.tableName), delMgrPath(dbName, tableName))
+
+    # Rename each index associated with this table
+    for index in table.indices:
+        _renameIndex(index, dbName, tableName)
+
 
 # Creates
 def createDatabase(dbName):
@@ -96,7 +127,7 @@ def createIndex(dbName, tableName, colName):
     assertDatabaseExists(dbName)
 
     if checkIndexExists(dbName, tableName, colName):
-        raise Exception("Index %s.%s_%s already exists" % (dbName, tableName, colName))
+        raise Exception("Index %s.%s already exists" % (dbName, indexFileName(tableName, colName)))
 
     # Create an index file
     open(indexPath(dbName, tableName, colName), "w+").close()
@@ -105,7 +136,7 @@ def createIndex(dbName, tableName, colName):
 
 def createPtrFstr(dbName, tableName, colName):
     if checkPtrFstrExists(dbName, tableName, colName):
-        raise Exception("Pointer-Type filestore %s.%s_%s already exists." % (dbName, tableName, colName))
+        raise Exception("Pointer-Type filestore %s.%s already exists." % (dbName, ptrFstrName(tableName, colName)))
 
     open(ptrFstrPath(dbName, tableName, colName), 'w+').close()
 
@@ -114,6 +145,7 @@ def createPtrFstr(dbName, tableName, colName):
 # Deletes
 def deleteDatabase(name):
     assertDatabaseExists(name)
+    os.listdir(dbPath(name)) # Flush updates to this directory to prevent hanging
     shutil.rmtree(dbPath(name), ignore_errors=True)
 
 def deleteIndex(dbName, tableName, colName):
@@ -122,6 +154,9 @@ def deleteIndex(dbName, tableName, colName):
     if checkIndexExists(dbName, tableName, colName):
         os.remove(indexPath(dbName, tableName, colName))
 
+    if checkDelMgrExists(dbName, indexFileName(tableName, colName)):
+        os.remove(delMgrPath(dbName, indexFileName(tableName, colName)))
+
 def deleteTable(dbName, name):
     assertDatabaseExists(dbName)
 
@@ -129,12 +164,12 @@ def deleteTable(dbName, name):
     if checkTableExists(dbName, name):
         os.remove(tablePath(dbName, name))
 
+    # Remove the del manager file
+    if checkDelMgrExists(dbName, name):
+        os.remove(delMgrPath(dbName, name))
+
     # Remove indices and the config file
     if checkConfigExists(dbName, name):
-        # Remove indices first so we don't lose reference to them
-
-        # TODO remove indices before we remove the config file
-
         os.remove(configPath(dbName, name))
 
 def deletePtrFstr(dbName, tableName, colName):
@@ -165,7 +200,7 @@ def getIndex(dbName, tableName, colName):
     assertDatabaseExists(dbName)
 
     if not checkIndexExists(dbName, tableName, colName):
-        raise Exception("Index %s.%s_%s does not exist!" % (dbName, tableName, colName))
+        raise Exception("Index %s.%s does not exist!" % (dbName, indexFileName(tableName, colName)))
 
     return openReadWriteFile(indexPath(dbName, tableName, colName))
 
@@ -181,6 +216,6 @@ def getPtrFstr(dbName, tableName, colName):
     assertDatabaseExists(dbName)
 
     if not checkPtrFstrExists(dbName, tableName, colName):
-        raise Exception("Pointer-Type filestore %s.%s_%s does not exists!" % (dbName, tableName, colName))
+        raise Exception("Pointer-Type filestore %s.%s does not exists!" % (dbName, ptrFstrName(tableName, colName)))
 
     return openReadWriteFile(ptrFstrPath(dbName, tableName, colName))

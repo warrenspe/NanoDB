@@ -2,3 +2,4 @@ test execute queries
 ensure that when a table config is made it includes the extra byte
 test nano conn
 test nanoio.table
+Accept names for ordering insert params & leaving params empty (defaulting to nullVal)

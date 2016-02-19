@@ -39,6 +39,7 @@ class DeletedBlockManager:
 
 
     def popRef(self):
+        self.fd.seek(0, os.SEEK_END)
         if self.fd.tell() == 0:
             return None
         self.fd.seek(-POINTER_TYPE.size, os.SEEK_END)

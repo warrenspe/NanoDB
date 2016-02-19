@@ -31,7 +31,7 @@ class TestIndex(NanoTests.NanoTestCase):
         self.indexConfig.unique = False
 
         NanoIO.File.deleteIndex(self.dbName, self.tableName, self.indexColName)
-        NanoIO.File.createIndex(self.dbName, self.tableName, self.indexColName)
+        NanoIO.File.createIndex(self.dbName, self.tableName, self.indexColName).close()
         self.IndexIO = NanoIO.Index.IndexIO(self.dbName, self.tableName, self.indexConfig)
 
     def tearDown(self):
@@ -162,7 +162,22 @@ class TestFile(NanoTests.NanoTestCase):
     tableName = "IOTestFile"
     indexColName = "IOTestIndexedColumn"
 
-    def testDatabaseUtils(self): # TODO figure out why this hangs - shutil?
+    def testRenaming(self): # TODO finish
+        '''col = NanoConfig.Column.Config()
+        col.name = self.indexColName
+        col.typeString = "int4"
+        self.indexConfig = NanoConfig.Index.Config()
+        self.indexConfig.column = col
+        self.indexConfig.unique = False
+
+        NanoIO.File.deleteIndex(self.dbName, self.tableName, self.indexColName)
+        NanoIO.File.createIndex(self.dbName, self.tableName, self.indexColName).close()
+
+        NanoIO.File.createTable(self.dbName, self.tableName).close()
+        tableIO = NanoIO.Table.TableIO(self.dbName, self.tableName)
+        indexIO = NanoIO.Index.IndexIO(self.dbName, self.tableName, self.indexConfig)'''
+
+    def testDatabaseUtils(self):
         NanoIO.File.createDatabase(self.dbName2)
 
         self.assertTrue(NanoIO.File.checkDatabaseExists(self.dbName2))
@@ -202,7 +217,7 @@ class TestFile(NanoTests.NanoTestCase):
     def testIndexUtils(self):
         self.assertTrue(NanoIO.File.checkDatabaseExists(self.dbName))
 
-        NanoIO.File.createIndex(self.dbName, self.tableName, self.indexColName)
+        NanoIO.File.createIndex(self.dbName, self.tableName, self.indexColName).close()
 
         self.assertTrue(NanoIO.File.checkIndexExists(self.dbName, self.tableName, self.indexColName))
         self.assertRaises(Exception, NanoIO.File.createIndex, self.dbName, self.tableName, self.indexColName)
@@ -223,7 +238,7 @@ class TestFile(NanoTests.NanoTestCase):
 
         self.assertFalse(NanoIO.File.checkPtrFstrExists(self.dbName, 'testTable', 'testCol'))
 
-        NanoIO.File.createPtrFstr(self.dbName, 'testTable', 'testCol')
+        NanoIO.File.createPtrFstr(self.dbName, 'testTable', 'testCol').close()
 
         self.assertTrue(NanoIO.File.checkPtrFstrExists(self.dbName, 'testTable', 'testCol'))
 
@@ -243,12 +258,12 @@ class TestFile(NanoTests.NanoTestCase):
     def testGetTablesInDatabase(self):
         self.assertTrue(NanoIO.File.checkDatabaseExists(self.dbName))
 
-        NanoIO.File.createTable(self.dbName, self.tableName)
+        NanoIO.File.createTable(self.dbName, self.tableName).close()
 
         self.assertTrue(NanoIO.File.checkTableExists(self.dbName, self.tableName))
         self.assertSequenceEqual(NanoIO.File.getTablesInDatabase(self.dbName), [self.tableName])
 
-        NanoIO.File.createTable(self.dbName, self.tableName + "1")
+        NanoIO.File.createTable(self.dbName, self.tableName + "1").close()
 
         self.assertTrue(NanoIO.File.checkTableExists(self.dbName, self.tableName + "1"))
         self.assertSequenceEqual(NanoIO.File.getTablesInDatabase(self.dbName), [self.tableName, self.tableName + "1"])
