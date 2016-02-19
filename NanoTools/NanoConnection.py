@@ -132,3 +132,5 @@ class NanoConnection:
         record = SelectDBExitRecord(self, self.dbName)
         self.dbName = dbName
         return record
+
+    use = selectDB

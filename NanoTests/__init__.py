@@ -1,19 +1,24 @@
 #!/usr/bin/python
 
 # Standard imports
-import unittest, argparse, sys
+import unittest, argparse, sys, os, glob
 
 sys.path.append('.')
 
 # Project imports
 import NanoIO.File
-import NanoConfig
 
 # Globals
 TEST_DIR = "NanoTests"
 
 class NanoTestCase(unittest.TestCase):
     dbName = "NanoDBUnitTests"
+
+    @classmethod
+    def tearDownClass(cls):
+        # Clear the testing database
+        for f in glob.glob(os.path.join(NanoIO.File.dbPath(cls.dbName), '*')):
+            os.remove(f)
 
 
 def run(verbosity=1):
@@ -41,12 +46,13 @@ def main():
     parser.add_argument("--verbosity", nargs="?", choices=['1', '2'], default=1)
     args = parser.parse_args()
 
-    NanoConfig.loadConfiguration(False)
+    # NanoConfig loads configuration by default; we want this to occur after we consume our cmdline args.
+    import NanoConfig
 
     if len(args.testFiles):
-        runSelective(args.testFiles, args.verbosity)
+        runSelective(args.testFiles, int(args.verbosity))
     else:
-        run(args.verbosity)
+        run(int(args.verbosity))
 
 if __name__ == '__main__':
     main()

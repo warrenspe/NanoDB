@@ -1,5 +1,8 @@
 #!/usr/bin/python
 
+# Standard imports
+import os
+
 # Project imports
 import NanoTests
 import NanoQueries
@@ -442,7 +445,13 @@ class TestNanoQueryParsing(NanoTests.NanoTestCase): # TODO test executing for ea
     def setUp(self):
         self.conn = NanoConnection.NanoConnection(self.dbName)
 
-    def testAlter(self):
+    def tearDown(self):
+        self.conn.close()
+
+        # Wipe the testing database after each unit test
+        NanoTests.NanoTestCase.tearDownClass()
+
+    def testAlter(self): # TODO test execute
         q = """Alter table Name
                add cOlUmn colName int4
                remove column otherName
@@ -526,38 +535,51 @@ class TestNanoQueryParsing(NanoTests.NanoTestCase): # TODO test executing for ea
         self.assertEqual(config.indices[0].column.typeString, "int4")
         self.assertEqual(config.indices[1].column.typeString, "char15")
 
-    def testDrop(self): # TODO test execute
-        q = """Drop table testing"""
+    def testDrop(self):
+        dbName3 = self.dbName + "3"
+        tableName = "testing"
+
+        self.conn.execute("Drop database if exists %s" % dbName3)
+
+        self.assertFalse(NanoIO.File.checkDatabaseExists(dbName3))
+        self.conn.execute("Create database %s" % dbName3)
+        self.assertTrue(NanoIO.File.checkDatabaseExists(dbName3))
+
+        self.conn.use(dbName3)
+
+        q = """Drop table %s""" % tableName
         a = NanoQueries.Drop(q)
 
         self.assertEqual(a.target, 'table')
         self.assertIsNone(a.ifExists)
-        self.assertEqual(a.name, 'testing')
+        self.assertEqual(a.name, tableName)
 
-# TODO update testing of execute
-#        self.assertFalse(NanoIO.File.checkTableExists(self.dbName, "testing"))
-#        self.assertFalse(NanoIO.File.checkConfigExists(self.dbName, "testing"))
-#        NanoIO.File.makeTable(self.dbName, "testing")
-#        self.assertTrue(NanoIO.File.checkTableExists(self.dbName, "testing"))
-#        self.assertTrue(NanoIO.File.checkConfigExists(self.dbName, "testing"))
-#
-#        self.conn.execute(q)
-#        self.assertFalse(NanoIO.File.checkTableExists(self.dbName, "testing"))
-#        self.assertFalse(NanoIO.File.checkConfigExists(self.dbName, "testing"))
+        self.assertFalse(NanoIO.File.checkTableExists(dbName3, tableName))
+        self.assertFalse(NanoIO.File.checkConfigExists(dbName3, tableName))
+        self.assertFalse(NanoIO.File.checkIndexExists(dbName3, tableName, "abc"))
+        self.conn.execute("Create table %s abc int4 index abc" % tableName)
+        self.assertTrue(NanoIO.File.checkTableExists(dbName3, tableName))
+        self.assertTrue(NanoIO.File.checkConfigExists(dbName3, tableName))
+        self.assertTrue(NanoIO.File.checkIndexExists(dbName3, tableName, "abc"))
 
-        q = """Drop database if exists db"""
+        self.conn.execute(q)
+
+        self.assertFalse(NanoIO.File.checkTableExists(dbName3, tableName))
+        self.assertFalse(NanoIO.File.checkConfigExists(dbName3, tableName))
+        self.assertFalse(NanoIO.File.checkIndexExists(dbName3, tableName, "abc"))
+        self.assertSequenceEqual(os.listdir(NanoIO.File.dbPath(dbName3)), [])
+
+
+        q = """Drop database if exists %s""" % dbName3
         a = NanoQueries.Drop(q)
 
         self.assertEqual(a.target, 'database')
         self.assertEqual(a.ifExists, 'exists')
-        self.assertEqual(a.name, 'db')
+        self.assertEqual(a.name, dbName3)
 
-# TODO udpate testing of execute
-#        self.assertFalse(NanoIO.File.checkDatabaseExists("db"))
-#        NanoIO.File.makeDatabase("db")
-#        NanoIO.File.makeTable("db", "testTable")
-#        self.conn.execute(q)
-#        self.assertFalse(NanoIO.File.checkDatabaseExists("db"))
+        self.conn.execute(q)
+
+        self.assertFalse(NanoIO.File.checkDatabaseExists(dbName3))
 
 
     def testRename(self): # TODO test execute

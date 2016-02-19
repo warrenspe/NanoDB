@@ -16,16 +16,11 @@ class Insert(BaseQuery):
     def executeQuery(self, conn):
         dbName, tableName = conn._parseName(self.name)
 
-        cursor = conn.getCursor(dbName, tableName)
+        tableIO = conn._getTable(self.name)
 
         # Ensure an expected number of values
-        if len(self.vals) != len(cursor.config.cols):
+        if len(self.vals) != len(tableIO.config.columns):
             raise Exception("Number of values given, %d != number columns, %d" % \
-                            (len(self.vals), len(cursor.config.cols)))
+                            (len(self.vals), len(tableIO.config.columns)))
 
-        # Type assertions
-        #for typ in cursor.config.cols:
-        #    try:
-        #        if typ == "int":
-        #            int( # TODO
-                
+        tableIO.insertRow(*self.vals)

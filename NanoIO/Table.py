@@ -16,14 +16,15 @@ from NanoBlocks._MemoryMappedBlock import MemoryMappedBlock
 class TableIO:
     """ Class which can be instantiated for a given table that can be later called to access / manipulate said table. """
 
-    dbName = None          # Name of the database this table resides in
-    tableName = None       # Name of the table we're manipulating
-    config = None          # A NanoConfig.Table.Config instance for this table
-    configFD = None        # A file descriptor open to the file for this table's configuration
-    tableFD = None         # A file descriptor open to the file for this table
-    indices = None         # A dictionary mapping column names on this table to NanoIO.Index.IndexIO instances
-    delMgr = None          # A NanoTools.DeletedBlockManager instance to manage deleted rows of this table
-    memoryMappedRow = None # A class subclassing MemoryMappedBlock that can be used to convert values to/from strings
+    dbName = None            # Name of the database this table resides in
+    tableName = None         # Name of the table we're manipulating
+    config = None            # A NanoConfig.Table.Config instance for this table
+    configFD = None          # A file descriptor open to the file for this table's configuration
+    tableFD = None           # A file descriptor open to the file for this table
+    indices = None           # A dictionary mapping column names on this table to NanoIO.Index.IndexIO instances
+    delMgr = None            # A NanoTools.DeletedBlockManager instance to manage deleted rows of this table
+    memoryMappedRow = None   # A class subclassing MemoryMappedBlock that can be used to convert values to/from strings
+    memoryMappedClass = None # A class of MemoryMappedBlock.MemoryMappedClass creating instances of our memoryMappedRow
 
     # Data Model methods
     def __init__(self, dbName, tableName):
@@ -81,9 +82,11 @@ class TableIO:
 
             blockSize = self.config.rowSize
             fields = ['_valid'] + [col.name for col in self.config.columns]
-            dataTypes = [NanoTypes.Uint(1)] + [NanoTypes.getType(col.typeString) for col in self.config.columns]
+            dataTypes = {col.name: NanoTypes.getType(col.typeString) for col in self.config.columns}
+            dataTypes['_valid'] = NanoTypes.Uint(1)
 
         self.memoryMappedRow = MemoryMappedRow
+        self.memoryMappedClass = MemoryMappedBlock.MemoryMappedClass(MemoryMappedRow)
 
 
     def _writeRowAt(self, pos, row):
@@ -116,7 +119,7 @@ class TableIO:
             raise Exception("Too many values given for table %s. Values: %s" % (self.config.name, args))
 
         for kwarg in kwargs:
-            if kwarg not in self.memorymappedRow.fields:
+            if kwarg not in self.memorymappedRow.fields[1:]:
                 raise Exception("Unknown value given for table %; value: %s" % (self.config.name, kwarg))
 
 
@@ -125,9 +128,9 @@ class TableIO:
         
         self._validateFields(*args, **kwargs)
 
-        row = self.MemoryMappedRow()
+        row = self.memoryMappedRow()
         row._valid = True
-        toSet = dict(zip(self.memoryMappedRow.fields, args))
+        toSet = dict(zip(self.memoryMappedRow.fields[1:], args))
         toSet.update(kwargs)
         for key, val in toSet.items():
             setattr(row, key, val)
@@ -167,7 +170,7 @@ class TableIO:
         """ Gets the row from this table at the given position (0, 1, 2, 3, ...). """
 
         self._seekPos(pos)
-        row = self.memoryMappedRow.fromString(self.tableFD.read(self.config.rowSize)) # TODO test if file is empty, get pos 1
+        row = self.memoryMappedClass.fromString(self.tableFD.read(self.config.rowSize)) # TODO test if file is empty, get pos 1
         if not row._valid:
             raise Exception("No data at position %d" % pos)
         return row
